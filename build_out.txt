@@ -1,0 +1,39 @@
+
+> couples-corner-admin@0.1.0 build
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.mjs took 82ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 83s
+  Running TypeScript ...
+  Finished TypeScript in 13.5s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/4) ...
+  Generating static pages using 3 workers (1/4) 
+  Generating static pages using 3 workers (2/4) 
+  Generating static pages using 3 workers (3/4) 
+✓ Generating static pages using 3 workers (4/4) in 1239ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/broadcast
+├ ƒ /admin/content
+├ ƒ /admin/couples
+├ ƒ /admin/reports
+├ ƒ /admin/security
+├ ƒ /admin/settings
+├ ƒ /admin/support
+└ ƒ /admin/users
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
