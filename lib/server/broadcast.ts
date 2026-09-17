@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/server/audit";
+import { requireActorUuid } from "@/lib/server/actor";
 import { createNotification } from "@/lib/server/notifications";
 import type { Broadcast, BroadcastAudience, BroadcastType } from "@/lib/models";
 
@@ -23,14 +24,17 @@ export async function createBroadcast(
   }
 
   const now = new Date().toISOString();
-  const { data } = await supabase
+  // `created_by` is a uuid column (FK to auth.users): resolve a real actor so a
+  // blank/pseudo uid can never reach Postgres as "".
+  const actorUid = await requireActorUuid(adminUid, "broadcast creation");
+  const { data, error } = await supabase
     .from("broadcasts")
     .insert({
       title: input.title.trim(),
       body: input.body.trim(),
       audience: input.audience,
       type: input.type,
-      created_by: adminUid,
+      created_by: actorUid,
       status: "draft",
       targeted_user_count: 0,
       created_at: now,
@@ -39,12 +43,22 @@ export async function createBroadcast(
     .select("id")
     .single();
 
+  if (!data) {
+    const message = error?.message ?? "Broadcast insert returned no row.";
+    throw new Error(
+      `Could not save broadcast draft: ${message}. ` +
+        "Verify the Supabase schema and retry."
+    );
+  }
+
+  const newBroadcastId = data.id;
+
   await recordAudit({
-    adminUserId: adminUid,
+    adminUserId: newBroadcastId,
     action: "broadcast.create",
-    targetRef: { type: "broadcast", id: data!.id },
+    targetRef: { type: "broadcast", id: newBroadcastId },
   });
-  return data!.id;
+  return newBroadcastId;
 }
 
 export async function listBroadcasts(): Promise<Broadcast[]> {

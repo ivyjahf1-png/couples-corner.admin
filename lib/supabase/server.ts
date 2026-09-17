@@ -51,18 +51,43 @@ export function getSupabaseServiceRoleKey(): string {
 }
 
 /**
- * Validate that a string looks like a valid JWT (three base64url-encoded
- * segments separated by dots). A malformed key is the most common cause of
- * "Invalid Compact JWS" errors from the Supabase Storage API — this check
- * catches the problem early with a descriptive error instead of letting it
- * propagate as a cryptic JWS failure.
+ * Validate that the configured key is usable as a *service role* key.
+ *
+ * Supabase issues two key generations and both must be accepted:
+ *
+ *  1. Legacy JWT keys — `eyJ…` with three base64url segments separated by
+ *     dots. A malformed/truncated JWT is the most common cause of
+ *     "Invalid Compact JWS" errors from the Storage API.
+ *  2. New-format secret keys — `sb_secret_<random>` (Supabase ≥ 2024).
+ *     These are NOT JWTs; the old three-segment check rejected them, which
+ *     made `getSupabaseServerClient()` return null and rendered every admin
+ *     metric as 0 even when the key was perfectly valid.
+ *
+ * Publishable keys (`sb_publishable_…`) and legacy anon JWTs are rejected:
+ * they are client-safe credentials and must never be used as the
+ * server-side service role key.
  */
-function isValidJwt(key: string): boolean {
+function isValidServiceRoleKey(key: string): boolean {
   if (!key || typeof key !== "string") return false;
+
+  // New-format secret key. Strict charset also rejects truncated values
+  // pasted with a literal "…" / "..." (e.g. "sb_secret_abc...").
+  if (key.startsWith("sb_secret_")) {
+    return /^sb_secret_[A-Za-z0-9_-]+$/.test(key);
+  }
+
+  // Publishable / anon credentials are never valid here.
+  if (key.startsWith("sb_publishable_")) return false;
+
+  // Legacy JWT: three non-empty base64url segments.
   const parts = key.split(".");
   if (parts.length !== 3) return false;
-  // Each segment must be non-empty base64url (A-Z, a-z, 0-9, '-', '_')
   return parts.every((p) => p.length > 0 && /^[A-Za-z0-9_-]+$/.test(p));
+}
+
+/** True when `key` is a legacy JWT (used only for diagnostic messaging). */
+function isLegacyJwtShape(key: string): boolean {
+  return key.split(".").length === 3;
 }
 
 let cachedClient: SupabaseClient | null = null;
@@ -77,12 +102,16 @@ export function getSupabaseServerClient(): SupabaseClient | null {
     console.warn("[Supabase] SUPABASE_SERVICE_ROLE_KEY is not set. Admin features will be unavailable.");
     return null;
   }
-  if (!isValidJwt(supabaseServiceRoleKey)) {
+  if (!isValidServiceRoleKey(supabaseServiceRoleKey)) {
+    const looksLikeJwt = isLegacyJwtShape(supabaseServiceRoleKey);
     console.error(
-      "[Supabase] SUPABASE_SERVICE_ROLE_KEY is set but is not a valid JWT. " +
-      "This causes 'Invalid Compact JWS' errors on Storage uploads. " +
-      "Copy the service_role key from your Supabase dashboard (Settings → API) " +
-      "and ensure it is not truncated, quoted, or replaced with the anon key."
+      "[Supabase] SUPABASE_SERVICE_ROLE_KEY is set but is not a usable service role key. " +
+        (looksLikeJwt
+          ? "It looks like a truncated or malformed legacy JWT. "
+          : "It is neither a legacy service_role JWT nor a new-format sb_secret_ key. ") +
+        "Every admin metric (including Total Users) will read 0 until this is fixed. " +
+        "Copy the FULL service_role / secret key from the Supabase dashboard (Settings → API) " +
+        "and ensure it is not truncated with a literal '...', wrapped in quotes, or the publishable/anon key."
     );
     return null;
   }

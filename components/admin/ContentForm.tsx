@@ -20,6 +20,7 @@ import {
   uploadContentMedia,
   uploadMultipleContentMedia,
 } from "@/lib/actions/content";
+import { generateUuid } from "@/lib/utils/uuid";
 
 interface ContentFormProps {
   category: ContentCategory;
@@ -207,7 +208,10 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
         }
         await updateContentAction(editingItem.id, payload, adminUid);
       } else {
-        const contentId = crypto.randomUUID();
+        // `generateUuid` falls back to crypto.getRandomValues when
+        // crypto.randomUUID is unavailable (non-secure/HTTP LAN contexts) so the
+        // content id is always a valid UUID rather than throwing mid-submit.
+        const contentId = generateUuid();
         if (fileSlots.length > 0) {
           setUploadProgress(`Uploading ${fileSlots.length} file${fileSlots.length > 1 ? "s" : ""}…`);
           const result = await uploadMultipleContentMedia(contentId, fileSlots.map((s) => s.file));
@@ -230,7 +234,7 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
   const canAddMore = fileSlots.length < MAX_FILES;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm">
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-orange-500/30 bg-slate-950 p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">
@@ -277,7 +281,7 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
                         /* eslint-disable jsx-a11y/media-has-caption */
                         <video src={slot.previewUrl} className="h-24 w-full object-cover" />
                       )}
-                      <button type="button" onClick={() => removeSlot(i)} className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white hover:bg-red-600" aria-label={`Remove ${slot.file.name}`}>
+                      <button type="button" onClick={() => removeSlot(i)} className="absolute right-1 top-1 rounded-full bg-slate-900/90 p-0.5 text-white hover:bg-red-600" aria-label={`Remove ${slot.file.name}`}>
                         <Icon name="x" className="h-3 w-3" />
                       </button>
                       <p className="truncate px-2 py-1 text-xs text-orange-200" title={slot.file.name}>{slot.file.name}</p>
@@ -286,7 +290,7 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
                   ))}
                 </div>
                 {canAddMore && (
-                  <label className="cursor-pointer self-start rounded-lg border border-orange-500/30 bg-slate-900 px-3 py-1.5 text-xs font-medium text-orange-200 hover:bg-orange-500/20">
+                  <label className="cursor-pointer self-start rounded-lg border border-orange-500/30 bg-purple-900 px-3 py-1.5 text-xs font-medium text-orange-200 hover:bg-orange-500/20">
                     + Add more ({fileSlots.length}/{MAX_FILES})
                     <input ref={fileInputRef} type="file" accept={acceptedTypes} multiple onChange={handleFileChange} className="hidden" />
                   </label>

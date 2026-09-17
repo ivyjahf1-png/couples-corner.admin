@@ -10,6 +10,7 @@ import {
   listContent, publishContent, unpublishContent, updateContent,
 } from "@/lib/server/content";
 import { ensureStorageBucket } from "@/lib/server/profiles";
+import { toUuidOrNull } from "@/lib/utils/uuid";
 
 export async function getContentList(filters: {
   category?: string; status?: ContentStatus;
@@ -24,7 +25,9 @@ export async function createContentAction(
   data: Omit<ContentItem, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">,
   adminUid: string, id?: string
 ) {
-  const contentId = await createContent(data, adminUid, id);
+  // Drop a blank/malformed client-supplied id (and never forward "") so the
+  // `content.id` column default generates the UUID in Postgres.
+  const contentId = await createContent(data, adminUid, toUuidOrNull(id) ?? undefined);
   revalidatePath("/admin/content");
   revalidatePath("/"); revalidatePath("/dashboard");
   revalidatePath("/discover"); revalidatePath("/matches"); revalidatePath("/messages");
@@ -80,7 +83,19 @@ export async function uploadContentMedia(
   }
   const name = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
   const path = `content/${contentId}/${new Date().getTime()}_${name}`;
-  await ensureStorageBucket(supabase, "media");
+
+  // Make sure the bucket exists before uploading ("Bucket not found" guard).
+  try {
+    await ensureStorageBucket(supabase, "media");
+  } catch (bucketError) {
+    const msg = bucketError instanceof Error ? bucketError.message : String(bucketError);
+    throw new Error(
+      `Storage bucket setup failed: ${msg}. ` +
+      `The "media" bucket may not exist in your Supabase project. ` +
+      `Run the migration 010_media_bucket.sql or create the bucket manually in Supabase Dashboard → Storage.`
+    );
+  }
+
   const buf = await file.arrayBuffer();
   // NOTE: Do NOT pass an explicit Authorization header here. The Supabase
   // client was created with the service role key, which it already injects
@@ -95,7 +110,11 @@ export async function uploadContentMedia(
     if (err) {
       // Surface the underlying Storage error so the client can show a
       // descriptive message instead of a generic "Upload failed".
-      throw new Error(`Storage upload failed: ${err.message}`);
+      const msg = err.message ?? "";
+      const hint = msg.toLowerCase().includes("jwt") || msg.toLowerCase().includes("token") || msg.includes("Invalid Compact JWS")
+        ? " (malformed SUPABASE_SERVICE_ROLE_KEY — copy the service_role key from Supabase → Settings → API)"
+        : "";
+      throw new Error(`Storage upload failed: ${msg}${hint}`);
     }
   } catch (err) {
     // Re-throw our own descriptive errors as-is.
@@ -111,8 +130,20 @@ export async function uploadContentMedia(
       "SUPABASE_SERVICE_ROLE_KEY env var is not truncated or quoted."
     );
   }
-  const { data: url } = supabase.storage.from("media").getPublicUrl(path);
-  return { mediaUrl: url.publicUrl };
+
+  // Resolve the public URL. `getPublicUrl` is synchronous and, in this
+  // supabase-js version, never returns an error — it only builds the string.
+  // Guard on the value anyway so a missing URL can never fail the form.
+  const { data: urlData } = supabase.storage.from("media").getPublicUrl(path);
+
+  if (!urlData?.publicUrl) {
+    // Fallback URL if public URL generation yields nothing
+    const fallbackUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/${path}`;
+    console.warn(`[Storage] getPublicUrl returned no URL for ${path}. Using constructed fallback.`);
+    return { mediaUrl: fallbackUrl };
+  }
+
+  return { mediaUrl: urlData.publicUrl };
 }
 
 export async function uploadMultipleContentMedia(
@@ -129,7 +160,18 @@ export async function uploadMultipleContentMedia(
       "service_role key from Supabase dashboard → Settings → API."
     );
   }
-  await ensureStorageBucket(supabase, "media");
+
+  // Make sure the bucket exists before uploading ("Bucket not found" guard).
+  try {
+    await ensureStorageBucket(supabase, "media");
+  } catch (bucketError) {
+    const msg = bucketError instanceof Error ? bucketError.message : String(bucketError);
+    throw new Error(
+      `Storage bucket setup failed: ${msg}. ` +
+      `The "media" bucket may not exist in your Supabase project. ` +
+      `Run the migration 010_media_bucket.sql or create the bucket manually in Supabase Dashboard → Storage.`
+    );
+  }
 
   // NOTE: Do NOT pass an explicit Authorization header per-file. The Supabase
   // client was created with the service role key, which it already injects
@@ -167,16 +209,26 @@ export async function uploadMultipleContentMedia(
       });
       if (err) {
         // Detect JWS / auth errors and surface a descriptive hint.
-        const msg = err.message ?? "";
+        const msg = err.message ?? "upload failed";
         const hint = msg.includes("Invalid Compact JWS") || msg.includes("invalid JWT")
           ? " (malformed SUPABASE_SERVICE_ROLE_KEY — copy the service_role key from Supabase → Settings → API)"
           : "";
         failures.push(`${file.name}: ${msg}${hint}`);
         continue;
       }
+      // See note above: `getPublicUrl` never errors, so guard on the value.
       const { data: url } = supabase.storage.from("media").getPublicUrl(path);
-      mediaUrls.push(url.publicUrl);
-      if (isImage && !thumbnailUrl) thumbnailUrl = url.publicUrl;
+
+      if (!url?.publicUrl) {
+        // Fallback URL if public URL generation yields nothing
+        const fallbackUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/${path}`;
+        console.warn(`[Storage] getPublicUrl returned no URL for ${path}. Using constructed fallback.`);
+        mediaUrls.push(fallbackUrl);
+        if (isImage && !thumbnailUrl) thumbnailUrl = fallbackUrl;
+      } else {
+        mediaUrls.push(url.publicUrl);
+        if (isImage && !thumbnailUrl) thumbnailUrl = url.publicUrl;
+      }
     } catch (e) {
       // Catch unexpected errors (including network failures and JWS errors
       // thrown outside the Supabase error envelope) with a descriptive hint.
