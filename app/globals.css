@@ -201,12 +201,35 @@
    instead of hardcoded hex values.
    -------------------------------------------------------------------------- */
 :root {
-  /* Root canvas gradient — derived from the theme's background palette. */
-  --background-gradient: linear-gradient(135deg, #020617 0%, #0f172a 55%, #1e293b 100%);
+  /* Deep-navy ramp: the dark end of the app canvas, defined once as the
+     source of truth so no raw hex is repeated at the point of use. */
+  --navy-950: #020617;
+  --navy-900: #0f172a;
+  --navy-800: #1e293b;
+
+  /* Canvas ramp: named tokens so the splash, launch, and loading surfaces
+     dynamically inherit the active theme. Each stop reads from the ramp
+     above — override `--navy-900` (or the semantic tokens inside
+     `.admin-dark`) and the entire canvas re-themes in a single place. */
+  --canvas-from: var(--navy-950);
+  --canvas-via: var(--navy-900);
+  --canvas-to: var(--navy-800);
+  /* Root canvas gradient — composed entirely from the canvas tokens above. */
+  --background-gradient: linear-gradient(
+    135deg,
+    var(--canvas-from) 0%,
+    var(--canvas-via) 55%,
+    var(--canvas-to) 100%
+  );
 }
 
 .admin-dark {
-  --background-gradient: linear-gradient(135deg, #020617 0%, #0f172a 55%, #1e293b 100%);
+  /* Re-derive the canvas ramp from the active dark theme tokens so the
+     splash / launch gradient always follows the app's current color tokens
+     and theme configuration instead of duplicating hardcoded hex values. */
+  --canvas-from: var(--background);
+  --canvas-via: var(--surface);
+  --canvas-to: var(--surface-muted);
 }
 
 .app-canvas {
@@ -248,10 +271,12 @@
 .card-content p { margin: 0 0 20px 0; font-size: 0.95rem; color: var(--ink-500); line-height: 1.5; }
 .card-btn { display: inline-block; width: 100%; padding: 12px 0; background-color: var(--brand-700); color: #ffffff; text-align: center; text-decoration: none; font-weight: 600; border-radius: 6px; transition: background-color 0.2s ease; }
 .admin-dark {
-  --background: #020617;
+  /* Dark semantic surfaces derive from the navy ramp so the admin zone and
+     the splash/launch canvas share one source of truth. */
+  --background: var(--navy-950);
   --foreground: #f8fafc;
-  --surface: #0f172a;
-  --surface-muted: #1e293b;
+  --surface: var(--navy-900);
+  --surface-muted: var(--navy-800);
   --border: #334155;
   --border-strong: #475569;
   --subtle: #94a3b8;

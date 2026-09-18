@@ -41,23 +41,23 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-dvh bg-purple-950 admin-dark">
+    <div className="admin-dark app-canvas min-h-dvh">
       <div className="mx-auto flex w-full max-w-7xl">
-        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-orange-500/20 bg-purple-900 px-4 py-6 lg:flex">
+        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-brand-500/20 bg-surface px-4 py-6 lg:flex">
           <div className="mb-8 px-2">
             <Logo as="span" />
           </div>
           <AdminNav />
-          <div className="mt-auto border-t border-orange-500/20 p-3">
-            <div className="flex items-center gap-3 rounded-xl border border-orange-500/30 bg-purple-800 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-orange-600 text-sm font-bold text-white">
+          <div className="mt-auto border-t border-brand-500/20 p-3">
+            <div className="flex items-center gap-3 rounded-xl border border-brand-500/30 bg-surface-muted p-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-600 text-sm font-bold text-white">
                 {adminUser ? adminUser.email.charAt(0).toUpperCase() : "A"}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {adminUser ? adminUser.email : "Administrator"}
                 </p>
-                <p className="truncate text-xs text-orange-300">Administrator</p>
+                <p className="truncate text-xs text-brand-400">Administrator</p>
               </div>
             </div>
           </div>
