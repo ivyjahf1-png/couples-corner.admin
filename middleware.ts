@@ -22,9 +22,9 @@ export function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get("couples_corner_session")?.value;
 
   if (!sessionCookie) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url, 302);
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl, 302);
   }
 
   return NextResponse.next({

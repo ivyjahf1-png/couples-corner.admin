@@ -108,11 +108,19 @@ export async function getCurrentSessionUser(
       }
     }
 
-    const { data: userRecord } = await supabase
-      .from("users")
-      .select("role, is_demo")
-      .eq("id", userId)
-      .single();
+    // Role lookup is fault-tolerant: on failure keep the verified session with
+    // the least-privileged role; admin requires a confirmed users-table row.
+    let userRecord: { role?: string | null; is_demo?: boolean | null } | null = null;
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("role, is_demo")
+        .eq("id", userId)
+        .single();
+      if (!error) userRecord = data;
+    } catch {
+      // Transient lookup failure — keep the session with the default role.
+    }
 
     const email = userEmail;
     const dbRole: SessionUser["role"] =

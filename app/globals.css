@@ -193,6 +193,29 @@
 .dot-loader .dot:nth-child(3) { animation-delay: 0.32s; }
 @keyframes dot-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 
+/* ----------------------------------------------------------------------------
+   Shared dark canvas for splash / launch / loading surfaces.
+   Entirely token-driven: --background and --background-gradient are CSS
+   variables, so the splash screen dynamically inherits the app's current
+   color tokens and theme configuration (including any .admin-dark override)
+   instead of hardcoded hex values.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Root canvas gradient — derived from the theme's background palette. */
+  --background-gradient: linear-gradient(135deg, #020617 0%, #0f172a 55%, #1e293b 100%);
+}
+
+.admin-dark {
+  --background-gradient: linear-gradient(135deg, #020617 0%, #0f172a 55%, #1e293b 100%);
+}
+
+.app-canvas {
+  background-color: var(--background);
+  background-image: var(--background-gradient);
+  background-attachment: fixed;
+  color: var(--foreground);
+}
+
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }

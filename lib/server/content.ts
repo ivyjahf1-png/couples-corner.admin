@@ -29,8 +29,11 @@ function assertValidPlacement(placement: string | null | undefined): void {
 }
 
 function dbToContentItem(row: Record<string, unknown>): ContentItem {
-  const mediaUrls = (row.media_urls as string[] | null) ?? [];
-  const primaryMediaUrl = (row.media_url as string) ?? mediaUrls[0] ?? "";
+  // The `content` table stores a single `media_url` column (migration 011).
+  // `mediaUrls` is a UI-level convenience array derived from it — the DB has
+  // no media_urls column, so never read or write that key on content rows.
+  const primaryMediaUrl = (row.media_url as string) ?? "";
+  const mediaUrls = primaryMediaUrl ? [primaryMediaUrl] : [];
   return {
     id: row.id as string,
     category: row.category as ContentItem["category"],
@@ -200,7 +203,9 @@ export async function updateContent(
   if (data.description !== undefined) updates.description = data.description;
   if (data.mediaType !== undefined) updates.media_type = data.mediaType;
   if (data.mediaUrl !== undefined) updates.media_url = data.mediaUrl;
-  if (data.mediaUrls !== undefined) updates.media_urls = data.mediaUrls;
+  // Note: `data.mediaUrls` is intentionally NOT persisted — the content table
+  // has only a single `media_url` column (migration 011). Multi-image support
+  // lives on other tables (posts.user_media), not here.
   if (data.thumbnailUrl !== undefined) updates.thumbnail_url = data.thumbnailUrl;
   if (data.buttonText !== undefined) updates.button_text = data.buttonText;
   if (data.destinationUrl !== undefined) updates.destination_url = data.destinationUrl;

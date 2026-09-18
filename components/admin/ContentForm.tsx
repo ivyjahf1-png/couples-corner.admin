@@ -17,9 +17,8 @@ import {
 import {
   createContentAction,
   updateContentAction,
-  uploadContentMedia,
-  uploadMultipleContentMedia,
 } from "@/lib/actions/content";
+import { uploadMediaFromBrowser } from "@/lib/utils/media-upload";
 import { generateUuid } from "@/lib/utils/uuid";
 
 interface ContentFormProps {
@@ -35,6 +34,62 @@ const inputClass =
   "mt-1 w-full rounded-lg border border-orange-500/30 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40";
 
 const labelClass = "text-sm font-medium text-orange-100";
+
+/**
+ * Professional ad-copy templates (high-end dating-app standards: warm,
+ * benefit-led, no pressure language). Selecting one fills the title and
+ * description fields; both remain fully editable afterwards.
+ */
+const COPY_TEMPLATES: { label: string; title: string; description: string }[] = [
+  {
+    label: "New members welcome",
+    title: "Every connection starts with hello",
+    description:
+      "Join thousands of singles and couples building genuine relationships. Verified profiles, safe conversations, and matches who share your values.",
+  },
+  {
+    label: "Featured profiles",
+    title: "Meet the most talked-about members this week",
+    description:
+      "Fresh faces, real stories, and meaningful intentions. Discover profiles curated for authenticity — and start a conversation that matters.",
+  },
+  {
+    label: "Complete your profile",
+    title: "Your next great match is looking for someone like you",
+    description:
+      "Profiles with photos and interests get up to 3× more connections. Complete yours in minutes and let the right people find you.",
+  },
+  {
+    label: "Safety first",
+    title: "Date with confidence, not caution",
+    description:
+      "Every profile is verified and every conversation is protected. Anti-scam moderation runs 24/7 so you can focus on real connection.",
+  },
+  {
+    label: "Events / seasonal",
+    title: "This season, don't spend it alone",
+    description:
+      "The holidays are better shared. Join today and discover members looking for something real — right in your city.",
+  },
+  {
+    label: "Couples community",
+    title: "Built for two — a private corner for couples",
+    description:
+      "Share moments, plan dates, and grow together in a space made for couples. Private, secure, and designed around your relationship.",
+  },
+  {
+    label: "Upgrade / premium",
+    title: "See who's already noticed you",
+    description:
+      "Unlock unlimited matches, read receipts, and priority visibility. The people you're looking for are closer than you think.",
+  },
+  {
+    label: "Success stories",
+    title: "From first message to forever",
+    description:
+      "Thousands of couples met here and never looked back. Your story could be next — start with a simple hello today.",
+  },
+];
 
 function isoToInput(iso: string): string {
   const d = new Date(iso);
@@ -201,7 +256,18 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
       if (editingItem) {
         if (fileSlots.length > 0) {
           setUploadProgress(`Uploading ${fileSlots.length} file${fileSlots.length > 1 ? "s" : ""}…`);
-          const result = await uploadMultipleContentMedia(editingItem.id, fileSlots.map((s) => s.file));
+          // Direct browser → Supabase Storage upload; only URL strings enter
+          // the Server Action payload (avoids the 1 MB action body limit).
+          const { result, warnings } = await uploadMediaFromBrowser(
+            editingItem.id,
+            fileSlots.map((s) => s.file)
+          );
+          if (result.mediaUrls.length === 0) {
+            throw new Error(warnings.join(" · ") || "All uploads failed.");
+          }
+          if (warnings.length > 0) {
+            console.warn("[ContentForm] partial upload failures:", warnings);
+          }
           payload.mediaUrl = result.mediaUrls[0];
           payload.mediaUrls = result.mediaUrls;
           payload.thumbnailUrl = result.mediaUrls[0];
@@ -214,7 +280,18 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
         const contentId = generateUuid();
         if (fileSlots.length > 0) {
           setUploadProgress(`Uploading ${fileSlots.length} file${fileSlots.length > 1 ? "s" : ""}…`);
-          const result = await uploadMultipleContentMedia(contentId, fileSlots.map((s) => s.file));
+          // Direct browser → Supabase Storage upload; only URL strings enter
+          // the Server Action payload (avoids the 1 MB action body limit).
+          const { result, warnings } = await uploadMediaFromBrowser(
+            contentId,
+            fileSlots.map((s) => s.file)
+          );
+          if (result.mediaUrls.length === 0) {
+            throw new Error(warnings.join(" · ") || "All uploads failed.");
+          }
+          if (warnings.length > 0) {
+            console.warn("[ContentForm] partial upload failures:", warnings);
+          }
           payload.mediaUrl = result.mediaUrls[0];
           payload.mediaUrls = result.mediaUrls;
           payload.thumbnailUrl = result.mediaUrls[0];
@@ -246,6 +323,24 @@ export function ContentForm({ category, editingItem, adminUid, onClose }: Conten
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label className={labelClass}>
+            Quick-start template
+            <select
+              value=""
+              onChange={(e) => {
+                const tpl = COPY_TEMPLATES[Number(e.target.value)];
+                if (!tpl) return;
+                setTitle(tpl.title);
+                setDescription(tpl.description);
+              }}
+              className={inputClass}
+            >
+              <option value="">Choose a professional template…</option>
+              {COPY_TEMPLATES.map((tpl, i) => (
+                <option key={tpl.label} value={i}>{tpl.label}</option>
+              ))}
+            </select>
+          </label>
           <label className={labelClass}>Title<input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="Summer campaign" /></label>
           <label className={labelClass}>Description<textarea value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} rows={2} placeholder="Optional description" /></label>
 

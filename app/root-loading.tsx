@@ -7,7 +7,7 @@ import { Logo } from "@/components/ui/Logo";
  */
 export function RootLoading() {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+    <div className="admin-dark app-canvas fixed inset-0 z-50 flex flex-col items-center justify-center">
       <div className="mb-6">
         <Logo as="div" />
       </div>
